@@ -1,83 +1,84 @@
-import { normalizeSiteData, defaultSiteData, type SiteData } from '#shared/site'
-import { useContentProvider } from './providers'
-import { cached, bustCache } from './cache'
-import { contentConfig } from './config'
+import { normalizeSiteData, type SiteData } from '#shared/site'
+import type { SiteDocument } from '#shared/types/dash'
+import { bustCache } from './cache'
+import { useDb } from './db'
 
-const SITE_KEY = 'site:data'
+/**
+ * The portfolio content lives in SQLite, one row per revision (see the
+ * `001-site-content` migration). The newest row is what the site shows.
+ */
 
-export interface SiteDocument {
-  data: SiteData
-  /** blob sha of site.json, or null when the file does not exist yet */
-  sha: string | null
-  /** false when the repo has no site.json and the built-in seed is in use */
-  fromRepo: boolean
+interface Row {
+  id: number
+  content: string
+  message: string
+  revised_at: string
 }
 
-async function loadSite(): Promise<SiteDocument> {
-  const provider = useContentProvider()
-  const path = contentConfig().siteFile
-
-  let raw: string
+function toDocument(row: Row): SiteDocument {
+  let parsed: unknown = null
   try {
-    raw = await provider.read(path)
-  } catch {
-    // no site.json in the repo yet — the seed in shared/site.ts is the site
-    return { data: structuredClone(defaultSiteData), sha: null, fromRepo: false }
-  }
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(row.content)
   } catch (error) {
-    console.error(`[site] ${path} is not valid JSON, falling back to the seed:`, error)
-    return { data: structuredClone(defaultSiteData), sha: null, fromRepo: false }
+    // the CHECK constraint makes this unreachable, but the seed is a better
+    // answer than a 500 if it ever happens
+    console.error(`[site] revision ${row.id} is not valid JSON, using the seed:`, error)
   }
-
-  const stat = await provider.stat(path).catch(() => null)
-  return { data: normalizeSiteData(parsed), sha: stat?.sha ?? null, fromRepo: true }
+  return {
+    data: normalizeSiteData(parsed),
+    revision: row.id,
+    revisedAt: row.revised_at,
+    message: row.message,
+  }
 }
 
-export async function getSiteDocument(): Promise<SiteDocument> {
-  return cached(SITE_KEY, contentConfig().ttl, loadSite)
+export function getSiteDocument(): SiteDocument {
+  const row = useDb()
+    .prepare('SELECT id, content, message, revised_at FROM site_content ORDER BY id DESC LIMIT 1')
+    .get() as Row | undefined
+
+  if (!row) {
+    // the migration guarantees a first row; if it is gone, that is a real bug
+    throw createError({ statusCode: 500, message: 'site_content is empty — run the migrations' })
+  }
+  return toDocument(row)
 }
 
-export async function getSiteData(): Promise<SiteData> {
-  return (await getSiteDocument()).data
+export function getSiteData(): SiteData {
+  return getSiteDocument().data
 }
 
-export function serializeSiteData(data: SiteData): string {
-  return `${JSON.stringify(data, null, 2)}\n`
-}
-
-export async function putSiteData(
+export function putSiteData(
   input: unknown,
-  options: { message: string; sha?: string | null },
-): Promise<{ sha: string; commit?: string; data: SiteData }> {
-  const provider = useContentProvider()
-  const path = contentConfig().siteFile
+  options: { message: string; revision?: number | null },
+): SiteDocument {
+  const db = useDb()
   const data = normalizeSiteData(input)
 
-  // trust the live sha over whatever the client believed, unless the client
-  // sent one — then it acts as the optimistic-concurrency check.
-  const current = await provider.stat(path).catch(() => null)
-  const sha = options.sha === undefined ? current?.sha : (options.sha ?? undefined)
+  const latest = db.prepare('SELECT MAX(id) AS id FROM site_content').get() as { id: number | null }
 
-  if (options.sha && current?.sha && options.sha !== current.sha) {
+  // the client sends the revision it loaded; anything newer means somebody
+  // else saved in between (another tab, most likely)
+  if (options.revision != null && latest.id != null && options.revision !== latest.id) {
     throw createError({
       statusCode: 409,
-      message: 'site.json changed in the repo since you loaded it — reload and reapply',
+      message: 'the content changed since you loaded it — reload and reapply',
     })
   }
 
-  const result = await provider.write({
-    path,
-    content: serializeSiteData(data),
-    message: options.message,
-    sha,
-  })
+  const result = db
+    .prepare('INSERT INTO site_content (content, message) VALUES (?, ?)')
+    .run(JSON.stringify(data), options.message)
 
-  bustCache('site:')
-  // the project list is built on top of site.json, so it is stale too
+  const row = db
+    .prepare('SELECT id, content, message, revised_at FROM site_content WHERE id = ?')
+    .get(Number(result.lastInsertRowid)) as Row | undefined
+
+  if (!row) {
+    throw createError({ statusCode: 500, message: 'saved revision could not be read back' })
+  }
+
+  // the project list is built on top of the content, so it is stale now
   bustCache('projects:')
-  return { sha: result.sha, commit: result.commit, data }
+  return toDocument(row)
 }

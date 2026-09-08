@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PROJECT_STATUSES, defaultSiteData, type Project, type SiteData } from '#shared/site'
-import type { DashSession } from '#shared/types/dash'
+import type { DashSession, SiteDocument } from '#shared/types/dash'
 import { EMPTY_SESSION, errorText } from '~/composables/useDash'
 
 definePageMeta({ middleware: 'dash' })
@@ -14,14 +14,19 @@ const { data } = await useAsyncData(
   async () => {
     const [session, doc] = await Promise.all([
       requestFetch<DashSession>('/api/dash/session'),
-      requestFetch<{ data: SiteData; sha: string | null; fromRepo: boolean }>('/api/dash/site'),
+      requestFetch<SiteDocument>('/api/dash/site'),
     ])
     return { session, doc }
   },
   {
     default: () => ({
       session: { ...EMPTY_SESSION },
-      doc: { data: structuredClone(defaultSiteData), sha: null, fromRepo: false },
+      doc: {
+        data: structuredClone(defaultSiteData),
+        revision: 0,
+        revisedAt: '',
+        message: '',
+      } as SiteDocument,
     }),
   },
 )
@@ -29,15 +34,15 @@ const { data } = await useAsyncData(
 const session = computed<DashSession>(() => data.value.session)
 
 const form = ref<SiteData>(structuredClone(defaultSiteData))
-const sha = ref<string | null>(null)
-const fromRepo = ref(false)
+const revision = ref(0)
+const revisedAt = ref('')
 const snapshot = ref('')
 const message = ref('')
 
 function hydrate() {
   form.value = structuredClone(toRaw(data.value.doc.data))
-  sha.value = data.value.doc.sha
-  fromRepo.value = data.value.doc.fromRepo
+  revision.value = data.value.doc.revision
+  revisedAt.value = data.value.doc.revisedAt
   snapshot.value = JSON.stringify(form.value)
 }
 
@@ -105,22 +110,22 @@ const busy = ref(false)
 const flash = ref<{ text: string; kind: 'ok' | 'error' } | null>(null)
 
 async function save() {
-  if (!session.value.writable || busy.value) return
+  if (busy.value) return
   busy.value = true
   flash.value = null
 
   try {
-    const result = await $fetch<{ sha: string; commit?: string; data: SiteData }>('/api/dash/site', {
+    const result = await $fetch<SiteDocument>('/api/dash/site', {
       method: 'PUT',
-      body: { data: form.value, sha: sha.value, message: message.value },
+      body: { data: form.value, revision: revision.value, message: message.value },
     })
-    sha.value = result.sha
-    fromRepo.value = true
+    revision.value = result.revision
+    revisedAt.value = result.revisedAt
     form.value = structuredClone(result.data)
     snapshot.value = JSON.stringify(form.value)
     message.value = ''
     flash.value = {
-      text: `committed${result.commit ? ` ${result.commit.slice(0, 7)}` : ''} — the site is live with these values`,
+      text: `saved revision ${result.revision} — the site is live with these values`,
       kind: 'ok',
     }
     await refreshNuxtData('site')
@@ -130,6 +135,11 @@ async function save() {
     busy.value = false
   }
 }
+
+const stamp = (iso: string) =>
+  new Intl.DateTimeFormat('en-CA', { dateStyle: 'short', timeStyle: 'short', timeZone: 'UTC' }).format(
+    new Date(iso),
+  ) + ' UTC'
 
 function revert() {
   hydrate()
@@ -148,8 +158,9 @@ onBeforeRouteLeave(() => {
 
     <div class="bar">
       <p class="small muted">
-        writes <code>{{ session.siteFile }}</code> to {{ session.repo }}.
-        <span v-if="!fromRepo" class="accent">the repo has no {{ session.siteFile }} yet — saving creates it.</span>
+        revision <span class="accent">#{{ revision }}</span>
+        <span v-if="revisedAt">· saved {{ stamp(revisedAt) }}</span>
+        <span v-if="data.doc.message" class="faint">· "{{ data.doc.message }}"</span>
       </p>
       <span v-if="dirty" class="accent tiny nowrap">● unsaved</span>
     </div>
@@ -328,24 +339,21 @@ onBeforeRouteLeave(() => {
       </div>
     </FrameBox>
 
-    <FrameBox tag="commit" class="block">
+    <FrameBox tag="save" class="block">
       <div class="commit-row">
         <label class="field msg">
-          <span class="label">commit message</span>
-          <input v-model="message" class="input" type="text" placeholder="site: update portfolio content">
+          <span class="label">note for this revision</span>
+          <input v-model="message" class="input" type="text" placeholder="update portfolio content">
         </label>
         <div class="row commit-actions">
-          <button class="btn btn-primary" type="button" :disabled="!session.writable || busy || !dirty" @click="save">
-            {{ busy ? 'committing…' : 'save' }}
+          <button class="btn btn-primary" type="button" :disabled="busy || !dirty" @click="save">
+            {{ busy ? 'saving…' : 'save' }}
           </button>
           <button class="btn" type="button" :disabled="!dirty || busy" @click="revert">revert</button>
         </div>
       </div>
 
-      <p v-if="!session.writable" class="flash flash-error note">
-        no write token configured — set <code>CONTENT_TOKEN</code> to commit from here.
-      </p>
-      <p v-else-if="flash" class="flash note" :class="`flash-${flash.kind}`">{{ flash.text }}</p>
+      <p v-if="flash" class="flash note" :class="`flash-${flash.kind}`">{{ flash.text }}</p>
     </FrameBox>
   </div>
 </template>

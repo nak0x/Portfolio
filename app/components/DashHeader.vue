@@ -5,6 +5,13 @@ import { dashLogout } from '~/composables/useDash'
 const props = defineProps<{ session: DashSession }>()
 const emit = defineEmits<{ 'signed-out': [] }>()
 
+// the token only gates posts (they are commits); the portfolio page writes to
+// sqlite and never needs it, so do not scare people there
+const route = useRoute()
+const postsReadOnly = computed(
+  () => props.session.authenticated && !props.session.writable && route.path !== '/dash/site',
+)
+
 async function logout() {
   await dashLogout()
   emit('signed-out')
@@ -19,11 +26,8 @@ async function logout() {
       <span v-if="props.session.repo" class="muted small nowrap">
         {{ props.session.provider }} · {{ props.session.repo }}@{{ props.session.branch }}
       </span>
-      <span
-        v-if="props.session.authenticated && !props.session.writable"
-        class="flash flash-error tiny"
-      >
-        read-only — no CONTENT_TOKEN
+      <span v-if="postsReadOnly" class="flash flash-error tiny">
+        posts read-only — no CONTENT_TOKEN
       </span>
     </div>
 

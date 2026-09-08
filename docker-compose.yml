@@ -19,7 +19,13 @@ services:
       CONTENT_TOKEN: ${CONTENT_TOKEN:-}
       CONTENT_TTL: ${CONTENT_TTL:-600}
       CONTENT_WEBHOOK_SECRET: ${CONTENT_WEBHOOK_SECRET:-}
-      CONTENT_SITE_FILE: ${CONTENT_SITE_FILE:-site.json}
+      DATABASE_PATH: /app/.data/site.sqlite
       DASH_PASSWORD: ${DASH_PASSWORD:-}
       DASH_SESSION_SECRET: ${DASH_SESSION_SECRET:-}
       DASH_SESSION_HOURS: ${DASH_SESSION_HOURS:-168}
+    volumes:
+      # the portfolio content — lose this and you are back to the seed
+      - folio-data:/app/.data
+
+volumes:
+  folio-data:

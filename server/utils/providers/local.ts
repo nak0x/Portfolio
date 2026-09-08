@@ -13,7 +13,7 @@ import { isMarkdown, normalizeDir } from './types'
  */
 export function createLocalProvider(opts: ProviderOptions): ContentProvider {
   // `localDir` stands in for the repo root, so paths look exactly like the git
-  // backends': `posts/foo.md`, `site.json`.
+  // backends': `posts/foo.md`.
   const root = resolve(process.cwd(), opts.localDir)
   const dir = normalizeDir(opts.dir)
 

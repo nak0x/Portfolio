@@ -15,7 +15,6 @@ export interface ContentConfig {
   ttl: number
   webhookSecret: string
   localDir: string
-  siteFile: string
 }
 
 export interface ProjectsConfig {
@@ -49,7 +48,6 @@ export function contentConfig(): ContentConfig {
     ttl: Number(env.CONTENT_TTL || baked.ttl) || 600,
     webhookSecret: env.CONTENT_WEBHOOK_SECRET || baked.webhookSecret,
     localDir: env.CONTENT_LOCAL_DIR || baked.localDir,
-    siteFile: env.CONTENT_SITE_FILE || baked.siteFile,
   }
 }
 

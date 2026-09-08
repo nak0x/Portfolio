@@ -1,18 +1,27 @@
 import type { PostMeta } from './blog'
+import type { SiteData } from '../site'
 
 export interface DashSession {
   /** false when DASH_PASSWORD is unset — the dashboard is off */
   enabled: boolean
   authenticated: boolean
-  /** false when the provider has no write token */
+  /** false when the provider has no write token — posts become read-only */
   writable: boolean
   provider?: string
   repo?: string
   branch?: string
   dir?: string
-  siteFile?: string
   ttl?: number
   webhook?: boolean
+}
+
+/** one revision of the portfolio content, as stored in sqlite */
+export interface SiteDocument {
+  data: SiteData
+  /** row id; send it back on save so a concurrent edit is refused with a 409 */
+  revision: number
+  revisedAt: string
+  message: string
 }
 
 export interface DashPost extends PostMeta {

@@ -8,7 +8,7 @@ const FEATURED_FALLBACK = 4
 
 /**
  * Every public repo of the configured github + gitea accounts, enriched by
- * `site.json`. Keyed, so the home page and /projects share one fetch.
+ * the portfolio content. Keyed, so the home page and /projects share one fetch.
  */
 export function useProjects() {
   const { data, refresh } = useAsyncData<ProjectsPayload>(
@@ -19,7 +19,7 @@ export function useProjects() {
 
   const projects = computed<RepoProject[]>(() => data.value?.projects ?? [])
 
-  // nothing flagged in site.json => the top of the sort is the selection
+  // nothing flagged from /dash => the top of the sort is the selection
   const featured = computed<RepoProject[]>(() => {
     const flagged = featuredOf(projects.value) as RepoProject[]
     return flagged.length ? flagged : projects.value.slice(0, FEATURED_FALLBACK)

@@ -35,6 +35,12 @@ COPY --from=build --chown=node:node /app/.output ./.output
 # only read when CONTENT_PROVIDER=local; a couple of KB, keeps that path usable
 COPY --from=build --chown=node:node /app/content ./content
 
+# sqlite lives here (DATABASE_PATH). mount a volume on it or the content is
+# reset to the seed on every deploy.
+RUN mkdir -p /app/.data && chown node:node /app/.data
+VOLUME ["/app/.data"]
+ENV DATABASE_PATH=/app/.data/site.sqlite
+
 USER node
 EXPOSE 3000
 

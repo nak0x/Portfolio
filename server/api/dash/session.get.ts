@@ -28,7 +28,6 @@ export default defineEventHandler((event) => {
     repo: content.repo,
     branch: content.branch,
     dir: content.dir,
-    siteFile: content.siteFile,
     ttl: content.ttl,
     webhook: !!content.webhookSecret,
   }

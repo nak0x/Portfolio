@@ -32,9 +32,12 @@ export default defineNuxtConfig({
       webhookSecret: process.env.CONTENT_WEBHOOK_SECRET || '',
       // folder used when provider === 'local' (handy for writing offline)
       localDir: process.env.CONTENT_LOCAL_DIR || 'content',
-      // portfolio data (bio, skills, links, projects), edited from /dash.
-      // relative to the repo root, not to CONTENT_DIR.
-      siteFile: process.env.CONTENT_SITE_FILE || 'site.json',
+    },
+
+    // --- database: portfolio content, edited from /dash ------------------
+    db: {
+      // sqlite file, relative to the working directory. mount a volume there.
+      path: process.env.DATABASE_PATH || '.data/site.sqlite',
     },
 
     // --- projects: public repos, read from the forges ---------------------

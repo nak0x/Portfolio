@@ -2,7 +2,7 @@
  * The project list is the public repositories of the configured github and
  * gitea accounts — not a list anybody maintains by hand.
  *
- * `site.json` still has a say: an entry there whose `href` or `name` matches a
+ * The portfolio content still has a say: an entry there whose `href` or `name` matches a
  * repository *enriches* it (bullets, a nicer name, a status, the featured
  * flag). Entries that match nothing are kept as `manual` projects, so a thing
  * with no repo behind it can still be shown.
@@ -98,7 +98,7 @@ const yearOf = (iso: string): string => {
 function deriveStatus(repo: ForgeRepo, pushedAt: string): ProjectStatus {
   if (repo.archived) return 'archived'
   const age = (Date.now() - Date.parse(pushedAt)) / 86_400_000
-  // anything quiet for a while is "done" rather than "abandoned"; site.json can
+  // anything quiet for a while is "done" rather than "abandoned"; /dash can
   // still call it 'wip' if that is closer to the truth
   return Number.isFinite(age) && age <= ACTIVE_DAYS ? 'active' : 'shipped'
 }
@@ -132,12 +132,12 @@ function toProject(repo: ForgeRepo, source: 'github' | 'gitea'): RepoProject | n
   }
 }
 
-// --- site.json overrides ---------------------------------------------------
+// --- portfolio overrides ---------------------------------------------------
 
 const normalizeHref = (href: string): string =>
   href.trim().toLowerCase().replace(/\.git$/, '').replace(/\/+$/, '')
 
-/** site.json wins wherever it actually says something */
+/** the /dash entry wins wherever it actually says something */
 function enrich(base: RepoProject, override: Project): RepoProject {
   return {
     ...base,
@@ -220,7 +220,7 @@ async function loadProjects(): Promise<ProjectsPayload> {
   const [github, gitea, site] = await Promise.all([
     readSource('github', cfg.githubUser, cfg, () => fetchGithubRepos(cfg)),
     readSource('gitea', cfg.giteaUser, cfg, () => fetchGiteaRepos(cfg)),
-    getSiteData(),
+    Promise.resolve(getSiteData()),
   ])
 
   // same repo mirrored on both forges: github is the public-facing one

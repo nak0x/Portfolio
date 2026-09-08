@@ -1,9 +1,8 @@
 import { defaultSiteData, type SiteData } from '#shared/site'
 
 /**
- * Portfolio content lives in the content repo (`site.json`) so /dash can edit
- * it. The seed compiled into the bundle is the fallback, which means the page
- * still renders if the repo is unreachable.
+ * Portfolio content lives in the sqlite database so /dash can edit it. The
+ * seed compiled into the bundle is the fallback while the fetch is in flight.
  *
  * Keyed, so the layout and the page share one fetch.
  */

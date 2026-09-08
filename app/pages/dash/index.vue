@@ -85,12 +85,12 @@ const stamp = (iso: string) =>
             <dd>{{ session.repo }} <span class="faint">@{{ session.branch }}</span></dd>
             <dt>posts in</dt>
             <dd>{{ session.dir || '<repo root>' }}/</dd>
-            <dt>portfolio</dt>
-            <dd>{{ session.siteFile }}</dd>
-            <dt>writes</dt>
+            <dt>post writes</dt>
             <dd :class="session.writable ? 'accent' : ''">
               {{ session.writable ? 'enabled' : 'disabled — set CONTENT_TOKEN' }}
             </dd>
+            <dt>portfolio</dt>
+            <dd>sqlite <span class="faint">· <NuxtLink to="/dash/site">edit</NuxtLink></span></dd>
             <dt>webhook</dt>
             <dd>{{ session.webhook ? 'configured' : 'not configured' }}</dd>
             <dt>cache ttl</dt>

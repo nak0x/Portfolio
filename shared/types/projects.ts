@@ -4,9 +4,9 @@ export type ProjectSource = 'github' | 'gitea' | 'manual'
 
 /**
  * A project as the site shows it: a public repository read from a forge,
- * optionally enriched by a matching entry in `site.json`.
+ * optionally enriched by a matching entry in the portfolio content.
  *
- * `manual` entries are the other way round — a `site.json` project that has no
+ * `manual` entries are the other way round — a /dash project that has no
  * repository behind it (or whose forge was unreachable).
  */
 export interface RepoProject extends Project {

@@ -1,0 +1,8 @@
+import type { Migration } from './types'
+import { siteContent } from './001-site-content'
+
+/**
+ * Applied in order, once each, at boot. Never edit or reorder an entry that
+ * has shipped — add a new one.
+ */
+export const migrations: Migration[] = [siteContent]

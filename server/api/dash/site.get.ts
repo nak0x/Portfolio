@@ -1,7 +1,7 @@
 import { assertDashSession } from '~~/server/utils/dash-auth'
 import { getSiteDocument } from '~~/server/utils/site'
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler((event) => {
   assertDashSession(event)
-  return await getSiteDocument()
+  return getSiteDocument()
 })

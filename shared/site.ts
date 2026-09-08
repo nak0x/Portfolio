@@ -1,9 +1,10 @@
 /**
  * The shape of everything the site says about you.
  *
- * The values below are the *seed*: they ship with the build and are what the
- * site falls back to when the content repo has no `site.json` yet, or when it
- * has one that is broken. Once `/dash` writes a `site.json`, that file wins.
+ * The values below are the *seed*: the first database migration copies them
+ * (minus the projects) into the `site_content` table, and after that the
+ * database wins — edit it from `/dash`. They are also what a missing or
+ * mistyped field falls back to when a stored revision is normalised.
  */
 
 export interface ProjectLink {
@@ -204,8 +205,8 @@ export const defaultSiteData: SiteData = {
 }
 
 // --- normalisation ---------------------------------------------------------
-// `site.json` comes from a git repo a human edits by hand. Anything missing or
-// mistyped falls back to the seed instead of taking the site down.
+// A stored revision is plain JSON that could have come from anywhere. Anything
+// missing or mistyped falls back to the seed instead of taking the site down.
 
 const str = (v: unknown, fallback: string): string =>
   typeof v === 'string' && v.trim() ? v : fallback

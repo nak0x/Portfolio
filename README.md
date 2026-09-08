@@ -2,22 +2,23 @@
 
 A monospace, terminal-shaped portfolio in Nuxt 4, with a blog whose posts live
 in a separate git repo as plain markdown. Push a `.md`, a webhook fires, the
-post is live. No rebuild, no CMS, no database.
+post is live. The portfolio itself (bio, skills, links, project overrides) sits
+in a one-file SQLite database, edited from `/dash`. No rebuild, no CMS.
 
 ```
   browser ──► nuxt (nitro, SSR)
                  │
-                 ├─ /          ──► site.json  ─┐
-                 ├─ /blog/*    ──► posts/*.md ─┼──► gitea api ──► content repo
-                 └─ /dash      ──► edits both ─┘         ▲
-                                                          │
-                          push ────────────────────────────┘
+                 ├─ /          ──► sqlite (site_content) ◄── /dash/site
+                 ├─ /blog/*    ──► posts/*.md ──► gitea api ──► content repo
+                 └─ /dash      ──► edits both                       ▲
+                                                                    │
+                          push ──────────────────────────────────────┘
                             └─ webhook ──► /api/webhook/content (busts cache)
 ```
 
-Two things live in the content repo: `posts/*.md` (the blog) and `site.json`
-(the portfolio — bio, skills, links, projects). `/dash` edits both and commits
-through the git API. Everything else is code.
+The content repo holds `posts/*.md` (the blog); `/dash` commits to it through
+the git API. The database holds the portfolio; `/dash` writes rows to it.
+Everything else is code.
 
 ## quick start
 
@@ -41,7 +42,6 @@ different commit rhythms.
 
 ```
 Journal/                     # the content repo (git.nak0x.dev/Nak0x/Journal)
-├── site.json                # portfolio content — written by /dash
 └── posts/
     ├── 2026-09-08-hello.md
     └── rust-on-old-thinkpads/
@@ -49,10 +49,7 @@ Journal/                     # the content repo (git.nak0x.dev/Nak0x/Journal)
         └── bench.png        # ![](./bench.png) resolves against the post's dir
 ```
 
-`site.json` is optional. Without it the site uses the seed compiled into
-[`shared/site.ts`](./shared/site.ts); the first save from `/dash` creates the
-file. A malformed or partial `site.json` degrades field by field back to that
-seed rather than taking the site down.
+The portfolio does not live there — see [the database](#the-database) below.
 
 Frontmatter — everything is optional except, in practice, `title`:
 
@@ -95,6 +92,43 @@ The webhook is an optimisation, not a dependency: `CONTENT_TTL` (default 600s)
 expires the cache anyway, and a stale copy is served while the refresh runs —
 so a Gitea outage degrades to "slightly old posts", never to a 502.
 
+## the database
+
+Portfolio content — everything on the home page that is not a post — lives in
+one SQLite file at `DATABASE_PATH` (default `.data/site.sqlite`), through
+`node:sqlite`. No driver, no native build, nothing to install.
+
+```
+site_content
+  id           INTEGER  row id, doubles as the revision number
+  content      TEXT     the whole SiteData as JSON (CHECK json_valid)
+  message      TEXT     the note typed in /dash when saving
+  revised_at   TEXT     ISO-8601 UTC, set by sqlite
+```
+
+Every save from `/dash/site` inserts a new row; the newest row is the site,
+older rows are history. The editor sends back the `id` it loaded, and a save
+against anything but the latest id is refused with a 409.
+
+Migrations are code, in [`server/db/migrations/`](./server/db/migrations),
+listed in order in its `index.ts`, and run at boot by
+[`server/plugins/db.ts`](./server/plugins/db.ts) before the first request. Each
+applied name is recorded in a `migrations` table so it runs exactly once. The
+first migration creates the table and inserts the seed from
+[`shared/site.ts`](./shared/site.ts) with an empty project list. A migration
+that throws aborts the boot — on purpose, a half-migrated schema is worse than
+a failed deploy.
+
+In Docker the file is at `/app/.data/site.sqlite`, declared as a volume;
+`docker-compose.yml` mounts `folio-data` there. On Coolify, add a persistent
+storage mount on `/app/.data` — without it every deploy starts from the seed.
+
+To inspect it by hand:
+
+```sh
+sqlite3 .data/site.sqlite 'select id, message, revised_at from site_content'
+```
+
 ## deploying on Coolify
 
 1. **New Resource → Application → Dockerfile** (or *Public/Private Repository*
@@ -105,11 +139,13 @@ so a Gitea outage degrades to "slightly old posts", never to a 502.
 4. **Environment variables** — paste from `.env.example` and fill in:
    `CONTENT_PROVIDER`, `CONTENT_REPO`, `CONTENT_BRANCH`, `CONTENT_DIR`,
    `GITEA_URL`, `CONTENT_WEBHOOK_SECRET`, `NUXT_PUBLIC_SITE_URL`, plus
-   `DASH_PASSWORD` and `CONTENT_TOKEN` if you want to edit from `/dash`.
-5. **Build variable** — `NUXT_PUBLIC_SITE_URL` is inlined into the client
+   `DASH_PASSWORD` to edit from `/dash` (and `CONTENT_TOKEN` to edit posts).
+5. **Persistent storage** — mount a volume on `/app/.data`. That is where the
+   SQLite file with the portfolio content lives.
+6. **Build variable** — `NUXT_PUBLIC_SITE_URL` is inlined into the client
    bundle, so it also has to exist at build time. In Coolify, tick *"Build
    Variable"* on it, or set the build arg `SITE_URL`.
-6. **Domain**: `https://nak0x.dev`. Coolify terminates TLS in front.
+7. **Domain**: `https://nak0x.dev`. Coolify terminates TLS in front.
 
 Redeploy on push to *this* repo is the usual Coolify webhook. Posts do not need
 a redeploy at all — that is the whole point.
@@ -130,7 +166,7 @@ Locally, `docker compose up --build` runs the same image.
 | `CONTENT_TTL`            | `600`                    | seconds before a cached post goes stale              |
 | `CONTENT_WEBHOOK_SECRET` | —                        | HMAC secret; without it the webhook returns 503      |
 | `CONTENT_LOCAL_DIR`      | `content`                | repo root used when `CONTENT_PROVIDER=local`         |
-| `CONTENT_SITE_FILE`      | `site.json`              | portfolio data, relative to the repo root            |
+| `DATABASE_PATH`          | `.data/site.sqlite`      | sqlite file holding the portfolio content            |
 | `PROJECTS_GITHUB_USER`   | `nak0x`                  | github account to list repos from (`''` disables)    |
 | `PROJECTS_GITEA_USER`    | `Nak0x`                  | gitea account to list repos from (`''` disables)     |
 | `PROJECTS_GITEA_URL`     | `GITEA_URL`              | gitea instance to read the repos from                |
@@ -147,25 +183,28 @@ Locally, `docker compose up --build` runs the same image.
 ## /dash — editing without a terminal
 
 `/dash` is a small single-user CMS for this site. It is disabled until
-`DASH_PASSWORD` is set, and it can only *write* once `CONTENT_TOKEN` holds a
-token with write access to the content repo (Gitea: scope `write:repository`).
-Without the token it still works, read-only.
+`DASH_PASSWORD` is set. The portfolio page writes to the database and needs
+nothing else; *posts* can only be written once `CONTENT_TOKEN` holds a token
+with write access to the content repo (Gitea: scope `write:repository`).
+Without the token the post editor still works, read-only.
 
 ```sh
 DASH_PASSWORD=$(openssl rand -hex 24)   # login
-CONTENT_TOKEN=…                         # gitea/github PAT, write scope
+CONTENT_TOKEN=…                         # gitea/github PAT, write scope (posts only)
 ```
 
 | page                | what it does                                                       |
 | ------------------- | ------------------------------------------------------------------ |
 | `/dash`             | repo status, post list, cache refresh, create/delete posts          |
 | `/dash/posts/:slug` | markdown editor with live preview; `new` creates a post             |
-| `/dash/site`        | bio, skills, links and the whole project list                       |
+| `/dash/site`        | bio, skills, links and the project overrides — saved to sqlite     |
 
-Every save is one commit through the git API — no separate deploy, no rebuild,
-and the history is the same one you get from pushing by hand. The editor sends
-the sha it loaded with each save, so if you also edited the file from nvim in
-the meantime you get a 409 instead of a silent overwrite.
+Every post save is one commit through the git API — no separate deploy, no
+rebuild, and the history is the same one you get from pushing by hand. The
+editor sends the sha it loaded with each save, so if you also edited the file
+from nvim in the meantime you get a 409 instead of a silent overwrite. Saving
+the portfolio inserts a revision row instead, with the same 409 guard on the
+revision id.
 
 The preview pane posts the body to `/api/dash/preview` and renders the HTML the
 published page would show, Shiki highlighting included — the client never gets a
@@ -195,7 +234,7 @@ wins). Each repo maps to a card on its own:
 | year         | the year the repo was created                              |
 | status       | `archived` if archived, `active` if pushed in the last 120 days, else `shipped` |
 
-The `projects` block in `site.json` is an **overlay** on top of that, not the
+The project list in `/dash/site` is an **overlay** on top of that, not the
 list itself. An entry whose `href` (preferred) or `name` matches a repository
 replaces that repo's fields wherever it actually says something — a nicer name,
 hand-written bullets, `featured: true` for the home page, `hidden: true` to drop
@@ -209,9 +248,10 @@ entries are all that is left — which is exactly the old hand-written list.
 
 ## editing the portfolio in code instead
 
-[`shared/site.ts`](./shared/site.ts) holds the seed and the types. Edit it when
-you want a change tracked in *this* repo rather than the content one — but note
-that a `site.json` in the content repo overrides it.
+[`shared/site.ts`](./shared/site.ts) holds the seed and the types. It is only
+read by the first migration and as the per-field fallback when a stored
+revision is missing something — once the database exists, the database wins.
+To push a change from code, add a migration that inserts a new revision.
 
 ## routes
 
@@ -229,6 +269,6 @@ that a `site.json` in the content repo overrides it.
 
 ## stack
 
-Nuxt 4 · Nitro (node-server) · markdown-it + Shiki · gray-matter · hand-written
-CSS. No UI framework, no client-side markdown, no database, ~zero JavaScript on
-the blog pages beyond hydration.
+Nuxt 4 · Nitro (node-server) · `node:sqlite` · markdown-it + Shiki ·
+gray-matter · hand-written CSS. No UI framework, no client-side markdown, no
+ORM, ~zero JavaScript on the blog pages beyond hydration.
