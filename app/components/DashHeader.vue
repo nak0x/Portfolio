@@ -9,7 +9,10 @@ const emit = defineEmits<{ 'signed-out': [] }>()
 // sqlite and never needs it, so do not scare people there
 const route = useRoute()
 const postsReadOnly = computed(
-  () => props.session.authenticated && !props.session.writable && route.path !== '/dash/site',
+  () =>
+    props.session.authenticated &&
+    !props.session.writable &&
+    (route.path === '/dash' || route.path.startsWith('/dash/posts')),
 )
 
 async function logout() {
@@ -34,6 +37,7 @@ async function logout() {
     <nav v-if="props.session.authenticated" class="row nav small">
       <NuxtLink to="/dash">posts</NuxtLink>
       <NuxtLink to="/dash/site">portfolio</NuxtLink>
+      <NuxtLink to="/dash/effect">effect</NuxtLink>
       <a href="/" target="_blank" rel="noopener">view site ↗</a>
       <button class="btn btn-ghost" type="button" @click="logout">logout</button>
     </nav>

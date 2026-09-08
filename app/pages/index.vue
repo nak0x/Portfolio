@@ -3,6 +3,7 @@ import type { PostMeta } from '#shared/types/blog'
 
 const { site } = useSiteData()
 const { featured } = useProjects()
+const { effect } = useEffectConfig()
 
 const { data } = await useFetch<{ posts: PostMeta[] }>('/api/blog', {
   key: 'home-posts',
@@ -22,6 +23,20 @@ useSeoMeta({
 <template>
   <div>
     <AsciiBanner />
+
+    <ClientOnly v-if="effect.enabled && effect.placement === 'background'">
+      <AsciiCloud :config="effect" />
+    </ClientOnly>
+
+    <section v-else-if="effect.enabled" class="cloud-block">
+      <FrameBox :tag="effect.label" class="cloud-frame">
+        <div class="cloud-slot" :style="{ height: `${effect.height}px` }">
+          <ClientOnly>
+            <AsciiCloud :config="effect" />
+          </ClientOnly>
+        </div>
+      </FrameBox>
+    </section>
 
     <section id="about" class="grid-2">
       <FrameBox tag="/about">
@@ -99,6 +114,20 @@ useSeoMeta({
 </template>
 
 <style scoped>
+.cloud-block {
+  margin-bottom: 1.25rem;
+}
+
+.cloud-frame {
+  padding: 0;
+}
+
+/* the server knows the height, so the box is reserved before webgl starts */
+.cloud-slot {
+  width: 100%;
+  overflow: hidden;
+}
+
 .about-meta {
   margin-top: 1.25rem;
   padding-top: 1rem;

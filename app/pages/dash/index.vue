@@ -108,6 +108,8 @@ const stamp = (iso: string) =>
             </dd>
             <dt>portfolio</dt>
             <dd>sqlite <span class="faint">· <NuxtLink to="/dash/site">edit</NuxtLink></span></dd>
+            <dt>home effect</dt>
+            <dd>sqlite <span class="faint">· <NuxtLink to="/dash/effect">edit</NuxtLink></span></dd>
             <dt>webhook</dt>
             <dd>{{ session.webhook ? 'configured' : 'not configured' }}</dd>
             <dt>cache ttl</dt>

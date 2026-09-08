@@ -20,12 +20,14 @@
     "markdown-it-anchor": "^10.0.0",
     "nuxt": "^4.5.2",
     "shiki": "^4.4.3",
+    "three": "^0.186.0",
     "vue": "^3.5.42",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^26.5.0",
+    "@types/three": "^0.185.4",
     "typescript": "^5.9.2",
     "vue-tsc": "^3.1.1"
   }
