@@ -8,7 +8,15 @@ export default defineEventHandler(async (event) => {
   assertDashSession(event)
 
   const cleared = bustCache()
-  await Promise.all([getIndex(), getProjects()])
 
-  return { ok: true, cleared }
+  // warm both again; a broken post source is reported, not fatal
+  const [posts] = await Promise.allSettled([getIndex(), getProjects()])
+  const postsError =
+    posts.status === 'rejected'
+      ? posts.reason instanceof Error
+        ? posts.reason.message
+        : String(posts.reason)
+      : null
+
+  return { ok: true, cleared, postsError }
 })

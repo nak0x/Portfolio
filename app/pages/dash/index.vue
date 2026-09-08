@@ -7,19 +7,32 @@ useSeoMeta({ title: 'dash', robots: 'noindex, nofollow' })
 const requestFetch = useRequestFetch()
 const { site } = useSiteData()
 
-const { data, refresh } = await useAsyncData(
+interface Overview {
+  session: DashSession
+  posts: DashPost[]
+  /** why the post list is missing — the repo being broken must not hide the rest */
+  postsError: string | null
+}
+
+const { data, refresh } = await useAsyncData<Overview>(
   'dash:overview',
   async () => {
     const session = await requestFetch<DashSession>('/api/dash/session')
-    if (!session.authenticated) return { session, posts: [] as DashPost[] }
-    const { posts } = await requestFetch<{ posts: DashPost[] }>('/api/dash/posts')
-    return { session, posts }
+    if (!session.authenticated) return { session, posts: [], postsError: null }
+
+    try {
+      const { posts } = await requestFetch<{ posts: DashPost[] }>('/api/dash/posts')
+      return { session, posts, postsError: null }
+    } catch (e) {
+      return { session, posts: [], postsError: errorText(e, 'could not list posts') }
+    }
   },
-  { default: () => ({ session: { ...EMPTY_SESSION }, posts: [] as DashPost[] }) },
+  { default: () => ({ session: { ...EMPTY_SESSION }, posts: [], postsError: null }) },
 )
 
 const session = computed(() => data.value.session)
 const posts = computed(() => data.value.posts)
+const postsError = computed(() => data.value.postsError)
 const published = computed(() => posts.value.filter((p) => !p.draft).length)
 const drafts = computed(() => posts.value.length - published.value)
 
@@ -35,9 +48,13 @@ async function refreshCache() {
   busy.value = true
   flash.value = null
   try {
-    const { cleared } = await $fetch<{ cleared: number }>('/api/dash/refresh', { method: 'POST' })
+    const { cleared, postsError } = await $fetch<{ cleared: number; postsError: string | null }>(
+      '/api/dash/refresh',
+      { method: 'POST' },
+    )
     await refresh()
-    say(`re-read the repo, dropped ${cleared} cached ${cleared === 1 ? 'entry' : 'entries'}`)
+    if (postsError) say(`dropped ${cleared} cached entries, but the post source still fails`, 'error')
+    else say(`re-read the repo, dropped ${cleared} cached ${cleared === 1 ? 'entry' : 'entries'}`)
   } catch (e) {
     say(errorText(e, 'could not refresh'), 'error')
   } finally {
@@ -124,7 +141,16 @@ const stamp = (iso: string) =>
       <AsciiRule label="posts" />
 
       <FrameBox tag="posts">
-        <p v-if="!posts.length" class="muted small empty">
+        <div v-if="postsError" class="flash flash-error empty">
+          <p>the post source is not answering — the portfolio editor still works.</p>
+          <p class="small">{{ postsError }}</p>
+          <p class="small muted">
+            check <code>GITEA_URL</code>, <code>CONTENT_REPO</code> and <code>CONTENT_BRANCH</code>,
+            then "re-read repo" above.
+          </p>
+        </div>
+
+        <p v-else-if="!posts.length" class="muted small empty">
           no markdown found in <code>{{ session.repo }}/{{ session.dir }}</code>. create the first
           one — it will be committed for you.
         </p>
