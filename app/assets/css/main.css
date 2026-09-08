@@ -7,6 +7,8 @@
 :root[data-theme='light'] {
   --paper: #f6f3ec;
   --paper-soft: #efece4;
+  /* paper you can see through, for frames sitting over the home-page cloud */
+  --paper-veil: rgb(246 243 236 / 0.72);
   --ink: #0a0a0a;
   --ink-mute: #4a4a4a;
   --ink-faint: #8a8a8a;
@@ -17,6 +19,7 @@
 :root[data-theme='dark'] {
   --paper: #0e0e10;
   --paper-soft: #16161a;
+  --paper-veil: rgb(14 14 16 / 0.66);
   --ink: #ece9e0;
   --ink-mute: #9a9a9a;
   --ink-faint: #6a6a6a;
@@ -28,6 +31,7 @@
   :root:not([data-theme]) {
     --paper: #0e0e10;
     --paper-soft: #16161a;
+    --paper-veil: rgb(14 14 16 / 0.66);
     --ink: #ece9e0;
     --ink-mute: #9a9a9a;
     --ink-faint: #6a6a6a;
@@ -174,6 +178,24 @@ pre { margin: 0; font-family: inherit; }
   /* the box is often an <a>, so undo the global link-hover fill */
   background: var(--paper);
   border-color: var(--accent);
+}
+
+/* On the home page the point cloud runs behind everything, so the frames let
+   it through and blur what they cover. Gated on support: without a working
+   backdrop-filter a translucent panel would just make the text hard to read. */
+@supports ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+  .veiled-frames .frame,
+  .veiled-frames .frame-tag,
+  .veiled-frames .frame::before,
+  .veiled-frames .frame::after,
+  .veiled-frames .accent-on-hover:hover {
+    background: var(--paper-veil);
+  }
+
+  .veiled-frames .frame {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
 }
 .accent-on-hover:hover::before,
 .accent-on-hover:hover::after {

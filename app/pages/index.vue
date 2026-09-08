@@ -21,7 +21,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <div>
+  <div class="veiled-frames">
     <AsciiBanner />
 
     <ClientOnly v-if="effect.enabled && effect.placement === 'background'">
