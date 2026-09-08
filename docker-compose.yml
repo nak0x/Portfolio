@@ -1,0 +1,25 @@
+# Local parity with what Coolify runs. `docker compose up --build`.
+services:
+  folio:
+    build:
+      context: .
+      args:
+        SITE_URL: ${NUXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    image: nak0x-folio
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      CONTENT_PROVIDER: ${CONTENT_PROVIDER:-gitea}
+      CONTENT_REPO: ${CONTENT_REPO:-Nak0x/Journal}
+      CONTENT_BRANCH: ${CONTENT_BRANCH:-main}
+      CONTENT_DIR: ${CONTENT_DIR:-posts}
+      GITEA_URL: ${GITEA_URL:-https://git.nak0x.dev}
+      CONTENT_TOKEN: ${CONTENT_TOKEN:-}
+      CONTENT_TTL: ${CONTENT_TTL:-600}
+      CONTENT_WEBHOOK_SECRET: ${CONTENT_WEBHOOK_SECRET:-}
+      CONTENT_SITE_FILE: ${CONTENT_SITE_FILE:-site.json}
+      DASH_PASSWORD: ${DASH_PASSWORD:-}
+      DASH_SESSION_SECRET: ${DASH_SESSION_SECRET:-}
+      DASH_SESSION_HOURS: ${DASH_SESSION_HOURS:-168}

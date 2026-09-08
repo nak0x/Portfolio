@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+.nuxt
+.output
+.data
+dist
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+README.md
+docker-compose.yml
